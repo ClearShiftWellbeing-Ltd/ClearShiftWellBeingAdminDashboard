@@ -249,47 +249,7 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Remaining delivery items</h2>
-          <p className="mb-5 text-sm text-gray-500">
-            These are the client follow-up items currently still in progress before final rollout.
-          </p>
-          <div className="space-y-3">
-            <StatusRow
-              title="Final aggregated reporting view"
-              status="In progress"
-              detail="The dashboard now shows live weekly snapshots; the next step is expanding this into the full employer reporting experience."
-              tone="amber"
-            />
-            <StatusRow
-              title="Weekly anonymised PDF reporting"
-              status="In progress"
-              detail="The weekly summary is now structured for export, and the PDF delivery workflow can be connected next."
-              tone="amber"
-            />
-            <StatusRow
-              title="Final launch and production setup"
-              status="Pending final rollout"
-              detail="Production deployment, private distribution setup, and final release checks remain the last launch-stage step."
-              tone="slate"
-            />
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">What the employer reporting will include</h2>
-          <p className="mb-5 text-sm text-gray-500">
-            This answers the client question about graphs and summaries versus raw answer lists.
-          </p>
-          <div className="space-y-3">
-            <InfoRow text="RAG totals and visual trend bars for each reporting period." />
-            <InfoRow text="Top concern themes based on repeated non-green answers." />
-            <InfoRow text="Anonymous reporting outputs with no employee email visibility." />
-            <InfoRow text="Weekly report snapshot cards that make each period easy to interpret." />
-          </div>
-        </div>
-      </section>
+   
     </div>
   );
 }
