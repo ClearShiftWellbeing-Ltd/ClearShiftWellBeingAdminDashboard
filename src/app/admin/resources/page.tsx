@@ -1,413 +1,326 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-
-// Use the same API base as privacy policy page
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://clearshiftwellbeingapis-production.up.railway.app";
 
-type SupportToolContent = {
-    _id: string;
-    tips: string[];
-    eap: string[];
-    hr: string[];
-    crisis: string[];
-    version: number;
-    isActive: boolean;
-    domain?: string;
-    updatedBy?: string;
-    createdAt?: string;
-    updatedAt?: string;
+type Resource = {
+  _id: string;
+  tips: string[];
+  eap: string[];
+  hr: string[];
+  crisis: string[];
+  version: number;
+  isActive: boolean;
+  domain?: string;
+  updatedAt?: string;
 };
 
-type CreateEditModal = {
-    isOpen: boolean;
-    mode: "create" | "edit";
-    selectedId?: string;
-    tips: string[];
-    eap: string[];
-    hr: string[];
-    crisis: string[];
-    domain: string;
+type Field = "tips" | "eap" | "hr" | "crisis";
+type ResourceModal = {
+  isOpen: boolean;
+  mode: "create" | "edit";
+  selectedId?: string;
+  tips: string[];
+  eap: string[];
+  hr: string[];
+  crisis: string[];
 };
 
-export default function AdminResourcesPage() {
-    const [domain, setDomain] = useState<string>("");
-    const [loading, setLoading] = useState(true);
-    const [err, setErr] = useState<string | null>(null);
+const emptyModal: ResourceModal = {
+  isOpen: false,
+  mode: "create",
+  tips: [],
+  eap: [],
+  hr: [],
+  crisis: [],
+};
 
-    const [items, setItems] = useState<SupportToolContent[]>([]);
-    const [modal, setModal] = useState<CreateEditModal>({
-        isOpen: false,
-        mode: "create",
-        tips: [],
-        eap: [],
-        hr: [],
-        crisis: [],
-        domain: "",
-    });
+const sections: { key: Field; title: string; description: string }[] = [
+  { key: "tips", title: "Wellbeing tips", description: "Short, practical advice for employees." },
+  { key: "eap", title: "Employee assistance (EAP)", description: "How employees can reach the assistance programme." },
+  { key: "hr", title: "HR support", description: "The right contact or process for workplace support." },
+  { key: "crisis", title: "Crisis support", description: "Urgent help details. Check these carefully before saving." },
+];
 
-    // 1) Get admin domain from session
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch("/api/admin/me", { cache: "no-store" });
-                const data = await res.json();
-                if (!res.ok || !data?.ok) {
-                    setErr("Session expired. Please log in again.");
-                    setLoading(false);
-                    return;
-                }
-                setDomain(data.admin.domain);
-            } catch (e: unknown) {
-                setErr(e instanceof Error ? e.message : "Unable to load session.");
-                setLoading(false);
-            }
-        })();
-    }, []);
-
-    const fetchResources = useCallback(async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${API_BASE}/content/support-tools/all?domain=${encodeURIComponent(domain)}`, {
-                cache: "no-store",
-            });
-            if (!res.ok) {
-                // If 404/error, maybe no items yet or wrong endpoint, but we try.
-                // Assuming standard error handling
-                if (res.status === 404) {
-                    setItems([]);
-                    setErr(null);
-                    return;
-                }
-                throw new Error(await res.text());
-            }
-            const data = await res.json();
-            console.log("Fetched resources data: ", data);
-            const list = Array.isArray(data.data) ? data.data : data.data?.items || [];
-            const mine = (list || []).filter(
-                (item: SupportToolContent) =>
-                    String(item?.domain || "").toLowerCase() === domain.toLowerCase()
-            );
-            setItems(mine);
-            setErr(null);
-        } catch (e: unknown) {
-            console.error(e);
-            setErr(e instanceof Error ? e.message : "Failed to load resources.");
-        } finally {
-            setLoading(false);
-        }
-    }, [domain]);
-
-    // 2) Load resources
-    useEffect(() => {
-        if (!domain) return;
-        fetchResources();
-    }, [domain, fetchResources]);
-
-    function openCreateModal() {
-        setModal({
-            isOpen: true,
-            mode: "create",
-            tips: [""],
-            eap: [""],
-            hr: [""],
-            crisis: [""],
-            domain: domain, // Pre-fill with session domain
-        });
-    }
-
-    function openEditModal(item: SupportToolContent) {
-        setModal({
-            isOpen: true,
-            mode: "edit",
-            selectedId: item._id,
-            tips: [...item.tips],
-            eap: [...item.eap],
-            hr: [...item.hr],
-            crisis: [...item.crisis],
-            domain: item.domain || domain,
-        });
-    }
-
-    function closeModal() {
-        setModal({
-            isOpen: false,
-            mode: "create",
-            tips: [],
-            eap: [],
-            hr: [],
-            crisis: [],
-            domain: "",
-        });
-    }
-
-    // Helper to manage list changes
-    function updateListInternal(
-        field: "tips" | "eap" | "hr" | "crisis",
-        newVal: string[]
-    ) {
-        setModal((prev) => ({ ...prev, [field]: newVal }));
-    }
-
-    async function saveResource() {
-        // Basic validation: ensure at least one item in each? Or just let them be empty?
-        // Let's filter out empty strings
-        const tips = modal.tips.map(s => s.trim()).filter(Boolean);
-        const eap = modal.eap.map(s => s.trim()).filter(Boolean);
-        const hr = modal.hr.map(s => s.trim()).filter(Boolean);
-        const crisis = modal.crisis.map(s => s.trim()).filter(Boolean);
-
-        try {
-            const url = modal.mode === "create"
-                ? `${API_BASE}/content/support-tools`
-                : `${API_BASE}/content/support-tools/${modal.selectedId}`;
-
-            const method = modal.mode === "create" ? "POST" : "PUT";
-
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    tips,
-                    eap,
-                    hr,
-                    crisis,
-                    domain,
-                    isActive: true, // Default active
-                }),
-            });
-
-            if (!res.ok) throw new Error(await res.text());
-
-            closeModal();
-            await fetchResources();
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : `${modal.mode === "create" ? "Create" : "Update"} failed`;
-            alert(msg);
-        }
-    }
-
-    async function deleteResource(id: string) {
-        if (!confirm("Delete this resource configuration?")) return;
-        try {
-            const res = await fetch(`${API_BASE}/content/support-tools/${id}`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ domain }),
-            });
-
-            if (!res.ok) throw new Error(await res.text());
-            await fetchResources();
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : "Delete failed";
-            alert(msg);
-        }
-    }
-
-    if (loading) return <div className="p-4">Loading...</div>;
-    if (err) return <div className="p-4 text-red-600">{err}</div>;
-
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-semibold">Resources Management</h1>
-                <p className="text-sm text-gray-500">Domain: <span className="font-mono">{domain}</span></p>
-            </div>
-
-            {/* List */}
-            <div className="overflow-hidden rounded-xl border bg-white dark:bg-white/[0.03]">
-                <div className="p-4 border-b flex items-center justify-between">
-                    <h2 className="font-semibold text-gray-800 dark:text-white">Support Tool Contents</h2>
-                    <button
-                        onClick={openCreateModal}
-                        className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-700"
-                    >
-                        Create +
-                    </button>
-                </div>
-
-                <div className="divide-y">
-                    {items.length === 0 && (
-                        <div className="p-4 text-gray-500 text-center">
-                            No resources found. Click &quot;Create +&quot; to add one.
-                        </div>
-                    )}
-                    {items.map((item) => (
-                        <div
-                            key={item._id}
-                            className="p-4 flex items-start justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.05]"
-                        >
-                            <div className="flex-1 min-w-0 space-y-2">
-                                <div className="flex gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                    Version: {item.version} | Active: {item.isActive ? "Yes" : "No"} | Domain: {item.domain || "N/A"}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 text-sm text-gray-700 dark:text-gray-300">
-                                    <div>
-                                        <strong>Tips:</strong> {item.tips.length} items
-                                    </div>
-                                    <div>
-                                        <strong>EAP:</strong> {item.eap.length} items
-                                    </div>
-                                    <div>
-                                        <strong>HR:</strong> {item.hr.length} items
-                                    </div>
-                                    <div>
-                                        <strong>Crisis:</strong> {item.crisis.length} items
-                                    </div>
-                                </div>
-                                {item.updatedAt && (
-                                    <div className="text-xs text-gray-400">
-                                        Updated: {new Date(item.updatedAt).toLocaleDateString()}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                    onClick={() => openEditModal(item)}
-                                    className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => deleteResource(item._id)}
-                                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Modal */}
-            {modal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl max-h-[90vh] flex flex-col">
-                        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between z-10 rounded-t-xl">
-                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-                                {modal.mode === "create" ? "Create Resources" : "Edit Resources"}
-                            </h3>
-                            <button
-                                onClick={closeModal}
-                                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-6 overflow-y-auto">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Domain
-                                </label>
-                                <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono">
-                                    {domain}
-                                </div>
-                            </div>
-
-                            <ListEditor
-                                title="Mental Health Tips"
-                                items={modal.tips}
-                                onChange={(items) => updateListInternal("tips", items)}
-                            />
-                            <ListEditor
-                                title="EAP Contact"
-                                items={modal.eap}
-                                onChange={(items) => updateListInternal("eap", items)}
-                            />
-                            <ListEditor
-                                title="HR Support"
-                                items={modal.hr}
-                                onChange={(items) => updateListInternal("hr", items)}
-                            />
-                            <ListEditor
-                                title="Crisis Line"
-                                items={modal.crisis}
-                                onChange={(items) => updateListInternal("crisis", items)}
-                            />
-                        </div>
-
-                        <div className="sticky bottom-0 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 p-6 flex gap-3 justify-end rounded-b-xl z-10">
-                            <button
-                                onClick={closeModal}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={saveResource}
-                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-                            >
-                                {modal.mode === "create" ? "Create" : "Update"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+function validDate(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
 }
 
-// Sub-component for editing a list of strings
-function ListEditor({
-    title,
-    items,
-    onChange
-}: {
-    title: string;
-    items: string[];
-    onChange: (newItems: string[]) => void;
-}) {
-    function handleChange(idx: number, val: string) {
-        const next = [...items];
-        next[idx] = val;
-        onChange(next);
-    }
+export default function AdminResourcesPage() {
+  const [domain, setDomain] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<Resource[]>([]);
+  const [modal, setModal] = useState<ResourceModal>(emptyModal);
+  const [saving, setSaving] = useState(false);
 
-    function add() {
-        onChange([...items, ""]);
-    }
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch("/api/admin/me", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || !data?.ok || !data?.admin?.domain) {
+          throw new Error("Session expired. Please log in again.");
+        }
+        setDomain(data.admin.domain);
+      } catch (cause: unknown) {
+        setError(cause instanceof Error ? cause.message : "Unable to load session.");
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-    function remove(idx: number) {
-        onChange(items.filter((_, i) => i !== idx));
+  const fetchResources = useCallback(async () => {
+    if (!domain) return;
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE}/content/support-tools/all?domain=${encodeURIComponent(domain)}`,
+        { cache: "no-store" }
+      );
+      if (response.status === 404) {
+        setItems([]);
+        setError(null);
+        return;
+      }
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      const list = Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.data?.items)
+          ? data.data.items
+          : [];
+      setItems(list.filter(
+        (item: Resource) => String(item?.domain || "").toLowerCase() === domain.toLowerCase()
+      ));
+      setError(null);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Failed to load resources.");
+    } finally {
+      setLoading(false);
     }
+  }, [domain]);
 
+  useEffect(() => {
+    if (domain) void fetchResources();
+  }, [domain, fetchResources]);
+
+  function createResource() {
+    setModal({ isOpen: true, mode: "create", tips: [""], eap: [""], hr: [""], crisis: [""] });
+  }
+
+  function editResource(item: Resource) {
+    setModal({
+      isOpen: true,
+      mode: "edit",
+      selectedId: item._id,
+      tips: [...(item.tips || [])],
+      eap: [...(item.eap || [])],
+      hr: [...(item.hr || [])],
+      crisis: [...(item.crisis || [])],
+    });
+  }
+
+  async function saveResource() {
+    setSaving(true);
+    try {
+      const isEditing = modal.mode === "edit";
+      const existing = items.find((item) => item._id === modal.selectedId);
+      const payload = {
+        tips: modal.tips.map((s) => s.trim()).filter(Boolean),
+        eap: modal.eap.map((s) => s.trim()).filter(Boolean),
+        hr: modal.hr.map((s) => s.trim()).filter(Boolean),
+        crisis: modal.crisis.map((s) => s.trim()).filter(Boolean),
+        domain,
+        isActive: isEditing ? (existing?.isActive ?? true) : true,
+      };
+      const response = await fetch(
+        isEditing ? `${API_BASE}/content/support-tools/${modal.selectedId}` : `${API_BASE}/content/support-tools`,
+        {
+          method: isEditing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!response.ok) throw new Error(await response.text());
+      setModal(emptyModal);
+      await fetchResources();
+    } catch (cause: unknown) {
+      alert(cause instanceof Error ? cause.message : "Unable to save resources.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteResource(id: string) {
+    if (!confirm("Delete this resource version? This cannot be undone.")) return;
+    try {
+      const response = await fetch(`${API_BASE}/content/support-tools/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      await fetchResources();
+    } catch (cause: unknown) {
+      alert(cause instanceof Error ? cause.message : "Unable to delete resources.");
+    }
+  }
+
+  if (loading) {
+    return <div className="rounded-3xl border border-[#e9e5d7] bg-white p-8 text-[#52645a]">Loading resources…</div>;
+  }
+  if (error) {
     return (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-gray-700 dark:text-gray-200">{title}</h4>
-                <button
-                    onClick={add}
-                    className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2 py-1 rounded"
-                >
-                    + Add Item
-                </button>
-            </div>
-            {items.length === 0 && <p className="text-sm text-gray-400 italic">No items yet.</p>}
-            <div className="space-y-2">
-                {items.map((it, idx) => (
-                    <div key={idx} className="flex gap-2">
-                        <input
-                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            value={it}
-                            onChange={(e) => handleChange(idx, e.target.value)}
-                            placeholder={`Item ${idx + 1}`}
-                        />
-                        <button
-                            onClick={() => remove(idx)}
-                            className="text-red-500 hover:text-red-700 px-2"
-                            title="Remove"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                ))}
-            </div>
-        </div>
+      <div className="rounded-3xl border border-[#e9e5d7] bg-white p-8">
+        <h1 className="text-xl font-semibold text-[#1f4d3d]">Resources</h1>
+        <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>
+        {domain && <button type="button" onClick={() => void fetchResources()} className="mt-5 rounded-xl bg-[#1f4d3d] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#173e30]">Try again</button>}
+      </div>
     );
+  }
+
+  const activeCount = items.filter((item) => item.isActive).length;
+
+  return (
+    <main className="space-y-6 bg-[#f7f8f5] pb-8 text-[#263b32]">
+      <section className="overflow-hidden rounded-3xl bg-[#1f4d3d] px-6 py-8 text-white shadow-sm sm:px-8">
+        <span className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#e9e5d7]">Employee support</span>
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-5">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Resources Management</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#e9e5d7]">Manage the wellbeing tips and support contacts available to your organisation.</p>
+            <p className="mt-3 text-xs text-[#d7e2d6]">Domain: {domain}</p>
+          </div>
+          <button type="button" onClick={createResource} className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#1f4d3d] shadow-sm hover:bg-[#e9e5d7]">+ Create resources</button>
+        </div>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Resource versions", value: items.length },
+          { label: "Active", value: activeCount },
+          { label: "Inactive", value: items.length - activeCount },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-2xl border border-[#e9e5d7] bg-white p-5 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#66766d]">{stat.label}</p>
+            <p className="mt-3 text-3xl font-semibold text-[#1f4d3d]">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <section className="rounded-3xl border border-[#e9e5d7] bg-white p-5 shadow-sm sm:p-7">
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-[#1f4d3d]">Support tool contents</h2>
+          <p className="mt-1 text-sm text-[#66766d]">Check the contacts and advice in each version before making changes.</p>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#d8dfd5] bg-[#f8faf7] px-6 py-12 text-center">
+            <p className="font-semibold text-[#1f4d3d]">No resources yet</p>
+            <p className="mt-2 text-sm text-[#66766d]">Create a resource set to add it to this list.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {items.map((item) => {
+              const date = validDate(item.updatedAt);
+              return (
+                <article key={item._id} className="rounded-2xl border border-[#e9e5d7] bg-[#fcfdfb] p-5 sm:p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-semibold text-[#1f4d3d]">Resource version {item.version}</h3>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.isActive ? "bg-[#e4f2e5] text-[#236044]" : "bg-[#f0eee8] text-[#66766d]"}`}>
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-[#748077]">Domain: {item.domain || domain}{date ? ` · Updated: ${date}` : ""}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button type="button" onClick={() => editResource(item)} className="rounded-xl border border-[#cbd9cd] bg-white px-4 py-2 text-sm font-medium text-[#1f4d3d] hover:bg-[#eef4ee]">Edit</button>
+                      <button type="button" onClick={() => void deleteResource(item._id)} className="rounded-xl border border-[#f2d7d4] bg-white px-4 py-2 text-sm font-medium text-[#a34039] hover:bg-[#fff3f1]">Delete</button>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {sections.map((section) => (
+                      <div key={section.key} className="rounded-xl border border-[#e9e5d7] bg-white p-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-[#66766d]">{section.title}</p>
+                        <p className="mt-2 text-lg font-semibold text-[#1f4d3d]">{item[section.key]?.length || 0} <span className="text-xs font-normal text-[#66766d]">items</span></p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#142f25]/60 p-3 sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setModal(emptyModal); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="resources-dialog-title" className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#e9e5d7] bg-[#f7f8f5] px-5 py-5 sm:px-7">
+              <div>
+                <h2 id="resources-dialog-title" className="text-xl font-semibold text-[#1f4d3d]">{modal.mode === "create" ? "Create resources" : "Edit resources"}</h2>
+                <p className="mt-1 text-sm text-[#66766d]">{domain}</p>
+              </div>
+              <button type="button" aria-label="Close dialog" disabled={saving} onClick={() => setModal(emptyModal)} className="rounded-lg px-2 text-2xl text-[#66766d] hover:bg-[#e9e5d7]">×</button>
+            </div>
+            <div className="space-y-5 overflow-y-auto px-5 py-6 sm:px-7">
+              {sections.map((section) => (
+                <ListEditor
+                  key={section.key}
+                  title={section.title}
+                  description={section.description}
+                  items={modal[section.key]}
+                  onChange={(next) => setModal((current) => ({ ...current, [section.key]: next }))}
+                />
+              ))}
+            </div>
+            <div className="flex justify-end gap-3 border-t border-[#e9e5d7] bg-[#f7f8f5] px-5 py-4 sm:px-7">
+              <button type="button" disabled={saving} onClick={() => setModal(emptyModal)} className="rounded-xl border border-[#d8dfd5] bg-white px-5 py-2.5 text-sm font-semibold text-[#1f4d3d] hover:bg-[#eef4ee]">Cancel</button>
+              <button type="button" disabled={saving} onClick={() => void saveResource()} className="rounded-xl bg-[#1f4d3d] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#173e30] disabled:opacity-60">{saving ? "Saving…" : modal.mode === "create" ? "Create resources" : "Save changes"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function ListEditor({ title, description, items, onChange }: {
+  title: string;
+  description: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-[#e9e5d7] bg-[#fcfdfb] p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-[#1f4d3d]">{title}</h3>
+          <p className="mt-1 text-xs text-[#66766d]">{description}</p>
+        </div>
+        <button type="button" onClick={() => onChange([...items, ""])} className="rounded-lg bg-[#e8f1e9] px-3 py-2 text-xs font-semibold text-[#1f4d3d] hover:bg-[#d8e8da]">+ Add item</button>
+      </div>
+      {items.length === 0 && <p className="mt-4 text-sm text-[#748077]">No items in this section.</p>}
+      <div className="mt-4 space-y-2">
+        {items.map((value, index) => (
+          <div key={index} className="flex gap-2">
+            <input
+              aria-label={`${title} item ${index + 1}`}
+              className="min-w-0 flex-1 rounded-xl border border-[#d8dfd5] bg-white px-3 py-2.5 text-sm text-[#263b32] outline-none focus:border-[#1f4d3d]"
+              value={value}
+              onChange={(event) => onChange(items.map((item, i) => i === index ? event.target.value : item))}
+              placeholder={`Item ${index + 1}`}
+            />
+            <button type="button" aria-label={`Remove ${title} item ${index + 1}`} onClick={() => onChange(items.filter((_, i) => i !== index))} className="rounded-xl border border-[#f2d7d4] bg-white px-3 text-sm font-semibold text-[#a34039] hover:bg-[#fff3f1]">Remove</button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
