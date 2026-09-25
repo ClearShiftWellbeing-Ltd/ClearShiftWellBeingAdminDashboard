@@ -19,7 +19,6 @@ type Submission = {
   wantsSupport: boolean;
 };
 
-const mock: Submission[] = []; // real data will come from your API
 
 function ragColor(rag: string) {
   if (rag === "red") return "bg-red-500";
