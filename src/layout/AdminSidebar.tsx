@@ -45,7 +45,17 @@ export default function AdminSidebar() {
       <div className={`border-b border-[#e4e8df] px-4 py-7 ${showLabels ? "" : "text-center"}`}>
         {showLabels ? (
           <Link href="/admin/dashboard" onClick={() => { if (isMobileOpen) toggleMobileSidebar(); }} className="block rounded-xl px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1f4d3d]">
-            <span className="block text-xl font-bold tracking-tight text-[#1f4d3d]">ClearShift<span className="text-[#5d8a69]">Wellbeing</span></span>
+            <span className="block">
+  <img
+    src="/images/IMG_4797.jpeg"
+    alt=""
+    className="mb-2 h-12 w-12 rounded-lg object-cover"
+    style={{ objectPosition: "center 65%" }}
+  />
+  <span className="block text-xl font-bold tracking-tight text-[#1f4d3d]">
+    ClearShift<span className="text-[#5d8a69]">Wellbeing</span>
+  </span>
+</span>
             <span className="mt-1 block text-[11px] font-medium uppercase tracking-[0.16em] text-[#66766d]">Organisation admin</span>
           </Link>
         ) : (
