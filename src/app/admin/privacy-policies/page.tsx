@@ -1,347 +1,288 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import dynamic from "next/dynamic";
-import "react-quill-new/dist/quill.snow.css";
 
-const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://clearshiftwellbeingapis-production.up.railway.app";
-
-type PrivacyPolicy = {
-    _id: string;
-    title: string;
-    content: string;
-    isActive: boolean;
-    domain?: string;
-    createdAt?: string;
-    updatedAt?: string;
+type Employee = {
+  _id: string;
+  domain: string;
+  name: string;
+  email: string;
+  role: "employee" | "admin";
+  emailVerified: boolean;
+  createdAt: string;
 };
 
-type CreateEditModal = {
-    isOpen: boolean;
-    mode: "create" | "edit";
-    selectedId?: string;
-    title: string;
-    content: string;
-    domain: string;
-};
+const API = process.env.NEXT_PUBLIC_API_BASE || "";
 
-export default function AdminPrivacyPoliciesPage() {
-    const [domain, setDomain] = useState<string>("");
-    const [loading, setLoading] = useState(true);
-    const [err, setErr] = useState<string | null>(null);
+export default function AdminUsersPage() {
+  const [domain, setDomain] = useState("");
+  const [items, setItems] = useState<Employee[]>([]);
+  const [seatLimit, setSeatLimit] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [editing, setEditing] = useState<Employee | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editRole, setEditRole] = useState<"employee" | "admin">("employee");
+  const [editVerified, setEditVerified] = useState(false);
 
-    const [items, setItems] = useState<PrivacyPolicy[]>([]);
-    const [modal, setModal] = useState<CreateEditModal>({
-        isOpen: false,
-        mode: "create",
-        title: "",
-        content: "",
-        domain: "",
-    });
-
-    // 1) Get admin domain from session
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch("/api/admin/me", { cache: "no-store" });
-                const data = await res.json();
-                if (!res.ok || !data?.ok) {
-                    setErr("Session expired. Please log in again.");
-                    setLoading(false);
-                    return;
-                }
-                setDomain(data.admin.domain);
-            } catch (e: unknown) {
-                setErr(e instanceof Error ? e.message : "Unable to load session.");
-                setLoading(false);
-            }
-        })();
-    }, []);
-
-    const fetchPrivacyPolicies = useCallback(async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${API_BASE}/content/privacy-policies?domain=${encodeURIComponent(domain)}`, {
-                cache: "no-store",
-            });
-            if (!res.ok) throw new Error(await res.text());
-            const data = await res.json();
-            console.log("Fetched privacy policies data: ", data);
-            const list = Array.isArray(data.data) ? data.data : data.data.items || [];
-            const mine = (list || []).filter(
-                (item: PrivacyPolicy) =>
-                    String(item?.domain || "").toLowerCase() === domain.toLowerCase()
-            );
-            setItems(mine);
-            setErr(null);
-        } catch (e: unknown) {
-            setErr(e instanceof Error ? e.message : "Failed to load privacy policies.");
-        } finally {
-            setLoading(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/me", { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) {
+          setErr("Session expired");
+          setLoading(false);
+          return;
         }
-    }, [domain]);
+        setDomain(data.admin.domain);
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : "Failed to load session");
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-    // 2) Load privacy policies
-    useEffect(() => {
-        if (!domain) return;
-        fetchPrivacyPolicies();
-    }, [domain, fetchPrivacyPolicies]);
-
-
-
-    function openCreateModal() {
-        setModal({
-            isOpen: true,
-            mode: "create",
-            title: "",
-            content: "",
-            domain: domain,
-        });
+  const reload = useCallback(async () => {
+    if (!domain) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/company/users?domain=${encodeURIComponent(domain)}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setItems(Array.isArray(data) ? data : data.items || []);
+      setErr(null);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to load users");
+    } finally {
+      setLoading(false);
     }
+  }, [domain]);
 
-    function openEditModal(policy: PrivacyPolicy) {
-        setModal({
-            isOpen: true,
-            mode: "edit",
-            selectedId: policy._id,
-            title: policy.title,
-            content: policy.content,
-            domain: policy.domain || domain,
-        });
+  useEffect(() => { if (domain) void reload(); }, [domain, reload]);
+
+  useEffect(() => {
+    (async () => {
+      if (!domain) return;
+      try {
+        const res = await fetch(`${API}/admins?domain=${encodeURIComponent(domain)}&limit=1`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const admin = Array.isArray(data) ? data[0] : data?.items?.[0];
+        setSeatLimit(typeof admin?.seatLimit === "number" ? admin.seatLimit : null);
+      } catch {
+        setSeatLimit(null);
+      }
+    })();
+  }, [domain]);
+
+  async function createUser() {
+    if (!email) return;
+    if (typeof seatLimit === "number" && items.length >= seatLimit) {
+      alert(`Seat limit reached (${items.length}/${seatLimit}).`);
+      return;
     }
-
-    function closeModal() {
-        setModal({
-            isOpen: false,
-            mode: "create",
-            title: "",
-            content: "",
-            domain: "",
-        });
+    try {
+      const res = await fetch(`${API}/company/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain, name, email }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setName("");
+      setEmail("");
+      await reload();
+      alert("Invitation sent");
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Create failed");
     }
+  }
 
-    async function savePrivacyPolicy() {
-        if (!modal.title.trim() || !modal.content.trim()) {
-            alert("Title and content are required.");
-            return;
-        }
+  function openEdit(u: Employee) {
+    setEditing(u);
+    setEditName(u.name || "");
+    setEditRole(u.role);
+    setEditVerified(!!u.emailVerified);
+  }
 
-        try {
-            const url = modal.mode === "create"
-                ? `${API_BASE}/content/privacy-policy`
-                : `${API_BASE}/content/privacy-policy/${modal.selectedId}`;
-
-            const method = modal.mode === "create" ? "POST" : "PUT";
-
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    title: modal.title.trim(),
-                    content: modal.content.trim(),
-                    domain,
-                    isActive: true,
-                }),
-            });
-
-            if (!res.ok) throw new Error(await res.text());
-
-            closeModal();
-            await fetchPrivacyPolicies();
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : `${modal.mode === "create" ? "Create" : "Update"} failed`;
-            alert(msg);
-        }
+  async function saveEdit() {
+    if (!editing) return;
+    try {
+      const res = await fetch(`${API}/company/users/${editing._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          domain,
+          name: editName,
+          role: editRole,
+          emailVerified: editVerified,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setEditing(null);
+      await reload();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Update failed");
     }
+  }
 
-    async function deletePrivacyPolicy(id: string) {
-        if (!confirm("Delete this privacy policy?")) return;
-        try {
-            const res = await fetch(`${API_BASE}/content/privacy-policy/${id}`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ domain }),
-            });
-
-            if (!res.ok) throw new Error(await res.text());
-            await fetchPrivacyPolicies();
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : "Delete failed";
-            alert(msg);
-        }
+  async function removeUser(id: string) {
+    if (!confirm("Delete this user?")) return;
+    try {
+      const res = await fetch(`${API}/company/users/${id}?domain=${encodeURIComponent(domain)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      await reload();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Delete failed");
     }
+  }
 
-    if (loading) return <div className="p-4">Loading…</div>;
-    if (err) return <div className="p-4 text-red-600">{err}</div>;
-
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-semibold">Privacy Policy Management</h1>
-                <p className="text-sm text-gray-500">Domain: <span className="font-mono">{domain}</span></p>
+  return (
+    <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="overflow-hidden rounded-3xl bg-[#1f4d3d] text-white shadow-[0_18px_50px_rgba(31,77,61,0.18)]">
+          <div className="relative px-6 py-7 sm:px-8 sm:py-9">
+            <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[42px] border-white/5" aria-hidden="true" />
+            <div className="relative flex flex-wrap items-start justify-between gap-5">
+              <div>
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#e9e5d7] text-xl text-[#1f4d3d]" aria-hidden="true">✦</div>
+                  <div>
+                    <p className="text-sm font-bold tracking-wide">ClearShiftWellbeing</p>
+                    <p className="text-xs text-emerald-100/75">Access management</p>
+                  </div>
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Users</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/80">
+                  Invite employees and manage their access to the app.
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold">
+                Seats: {items.length}/{typeof seatLimit === "number" ? seatLimit : "Unlimited"}
+              </div>
             </div>
+          </div>
+        </header>
 
-            {/* List */}
-            <div className="overflow-hidden rounded-xl border bg-white dark:bg-white/[0.03]">
-                <div className="p-4 border-b flex items-center justify-between">
-                    <h2 className="font-semibold text-gray-800 dark:text-white">Privacy Policies</h2>
-                    <button
-                        onClick={openCreateModal}
-                        className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-700"
-                    >
-                        Create +
-                    </button>
-                </div>
+        {err && (
+          <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+            {err}
+          </div>
+        )}
 
-                <div className="divide-y">
-                    {items.length === 0 && (
-                        <div className="p-4 text-gray-500 text-center">
-                            No privacy policies yet. Click &quot;Create +&quot; to add one.
-                        </div>
-                    )}
-                    {items.map((policy) => (
-                        <div
-                            key={policy._id}
-                            className="p-4 flex items-start justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.05]"
-                        >
-                            <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-gray-800 dark:text-white truncate">
-                                    {policy.title}
-                                </div>
-                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                                    {policy.content}
-                                </div>
-                                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                                    <span className={`px-2 py-1 rounded-md ${policy.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}>
-                                        {policy.isActive ? "Active" : "Inactive"}
-                                    </span>
-                                    <span>Domain: {policy.domain || "N/A"}</span>
-                                    {policy.updatedAt && (
-                                        <span>Updated: {new Date(policy.updatedAt).toLocaleDateString()}</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                    onClick={() => openEditModal(policy)}
-                                    className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => deletePrivacyPolicy(policy._id)}
-                                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Modal */}
-            {modal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="relative w-full max-w-3xl bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl max-h-[90vh] overflow-y-auto">
-                        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
-                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-                                {modal.mode === "create" ? "Create Privacy Policy" : "Edit Privacy Policy"}
-                            </h3>
-                            <button
-                                onClick={closeModal}
-                                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Title
-                                </label>
-                                <input
-                                    type="text"
-                                    value={modal.title}
-                                    onChange={(e) => setModal({ ...modal, title: e.target.value })}
-                                    placeholder="e.g., Privacy Policy 2024"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Domain
-                                </label>
-                                <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono">
-                                    {domain}
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Content
-                                </label>
-                                <div className="bg-white dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
-                                    <ReactQuill
-                                        className="h-[400px] mb-12"
-                                        value={modal.content}
-                                        onChange={(content) => setModal({ ...modal, content })}
-                                        modules={{
-                                            toolbar: [
-                                                [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-                                                ['bold', 'italic', 'underline', 'strike'],
-                                                [{ 'color': [] }, { 'background': [] }],
-                                                [{ 'align': [] }],
-                                                ['blockquote', 'code-block'],
-                                                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                                                [{ 'indent': '-1' }, { 'indent': '+1' }],
-                                                ['link', 'image'],
-                                                ['clean']
-                                            ]
-                                        }}
-                                        formats={[
-                                            'header',
-                                            'bold', 'italic', 'underline', 'strike',
-                                            'color', 'background',
-                                            'align',
-                                            'blockquote', 'code-block',
-                                            'list', 'indent',
-                                            'link', 'image'
-                                        ]}
-                                        placeholder="Enter your privacy policy content here..."
-                                        theme="snow"
-                                    />
-                                </div>
-                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    Use the toolbar to format your privacy policy with headings, text styling, lists, links, and more.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="sticky bottom-0 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 p-6 flex gap-3 justify-end">
-                            <button
-                                onClick={closeModal}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={savePrivacyPolicy}
-                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-                            >
-                                {modal.mode === "create" ? "Create" : "Update"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+        <div className="flex flex-wrap items-end justify-between gap-3 px-1">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#38745f]">Organisation</p>
+            <h2 className="mt-1 break-all text-xl font-bold">{domain || "Loading…"}</h2>
+          </div>
+          <button type="button" onClick={() => void reload()} disabled={!domain || loading}
+            className="rounded-xl border border-[#d8e5df] bg-white px-4 py-2.5 text-sm font-semibold text-[#285444] hover:bg-[#eef5f1] disabled:opacity-50">
+            {loading ? "Refreshing…" : "Refresh users"}
+          </button>
         </div>
-    );
+
+        <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.06)] sm:p-7">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#38745f]">Employee access</p>
+          <h2 className="mt-1 text-xl font-bold">Invite a user</h2>
+          <p className="mt-2 text-sm text-slate-500">An email address is needed to send an invitation.</p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="invite-name" className="block text-sm font-semibold text-slate-700">Name (optional)</label>
+              <input id="invite-name" value={name} onChange={(e) => setName(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-[#fbfcfa] px-4 py-3 text-sm outline-none focus:border-[#38745f] focus:ring-2 focus:ring-[#38745f]/15" />
+            </div>
+            <div>
+              <label htmlFor="invite-email" className="block text-sm font-semibold text-slate-700">Email</label>
+              <input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="employee@company.com"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-[#fbfcfa] px-4 py-3 text-sm outline-none focus:border-[#38745f] focus:ring-2 focus:ring-[#38745f]/15" />
+            </div>
+          </div>
+          <button type="button" onClick={() => void createUser()}
+            disabled={!domain || !email.trim() || (typeof seatLimit === "number" && items.length >= seatLimit)}
+            className="mt-5 rounded-xl bg-[#1f4d3d] px-5 py-3 text-sm font-bold text-white hover:bg-[#173c30] disabled:cursor-not-allowed disabled:opacity-50">
+            Invite user
+          </button>
+        </section>
+
+        <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+          <div className="border-b border-slate-100 p-6 sm:p-7">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#38745f]">Directory</p>
+            <h2 className="mt-1 text-xl font-bold">All users</h2>
+            <p className="mt-2 text-sm text-slate-500">Emails here identify people for invitations and access management. Check-in answers are handled separately.</p>
+          </div>
+          {loading ? (
+            <p role="status" className="p-7 text-sm text-slate-500">Loading users…</p>
+          ) : items.length === 0 ? (
+            <p className="p-7 text-sm text-slate-500">No users yet.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {items.map((u) => (
+                <li key={u._id} className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#eef5f1] text-sm font-bold text-[#285444]" aria-hidden="true">
+                      {(u.name || u.email || "?").charAt(0).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-slate-900">{u.name || "(no name)"}</p>
+                        <span className="rounded-full bg-[#eef5f1] px-2.5 py-1 text-xs font-bold capitalize text-[#285444]">{u.role}</span>
+                      </div>
+                      <p className="mt-1 break-all text-sm text-slate-600">{u.email}</p>
+                      <p className="mt-1 text-xs text-slate-500">{u.emailVerified ? "Verified" : "Unverified"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => openEdit(u)}
+                      className="rounded-lg border border-[#d8e5df] px-3 py-2 text-sm font-semibold text-[#285444] hover:bg-[#eef5f1]">Edit</button>
+                    <button type="button" onClick={() => void removeUser(u._id)}
+                      className="rounded-lg px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">Delete</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {editing && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="edit-user-heading"
+              className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-7">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#38745f]">Access management</p>
+              <h3 id="edit-user-heading" className="mt-1 text-xl font-bold">Edit user</h3>
+              <p className="mt-1 break-all text-sm text-slate-500">{editing.email}</p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label htmlFor="edit-name" className="block text-sm font-semibold text-slate-700">Name</label>
+                  <input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-[#fbfcfa] px-4 py-3 text-sm outline-none focus:border-[#38745f]" />
+                </div>
+                <div>
+                  <label htmlFor="edit-role" className="block text-sm font-semibold text-slate-700">Role</label>
+                  <select id="edit-role" value={editRole} onChange={(e) => setEditRole(e.target.value as "employee" | "admin")}
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-[#fbfcfa] px-4 py-3 text-sm outline-none focus:border-[#38745f]">
+                    <option value="employee">Employee</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <label className="flex items-center gap-3 rounded-xl bg-[#f8faf7] p-3 text-sm font-semibold text-slate-700">
+                  <input type="checkbox" checked={editVerified} onChange={(e) => setEditVerified(e.target.checked)}
+                    className="h-4 w-4 accent-[#1f4d3d]" />
+                  Email verified
+                </label>
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={() => setEditing(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                <button type="button" onClick={() => void saveEdit()}
+                  className="rounded-xl bg-[#1f4d3d] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#173c30]">Save changes</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
 }
