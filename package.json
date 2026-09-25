@@ -21,6 +21,7 @@
     "@tailwindcss/postcss": "^4.0.9",
     "@tinymce/tinymce-react": "^6.3.0",
     "apexcharts": "^4.3.0",
+    "jspdf": "2.5.1",
     "autoprefixer": "^10.4.20",
     "axios": "^1.12.2",
     "crypto": "^1.0.1",
