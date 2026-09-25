@@ -316,43 +316,6 @@ function TrendBar({
   );
 }
 
-function StatusRow({
-  title,
-  status,
-  detail,
-  tone,
-}: {
-  title: string;
-  status: string;
-  detail: string;
-  tone: "amber" | "slate";
-}) {
-  const badgeClass =
-    tone === "amber"
-      ? "bg-amber-100 text-amber-800"
-      : "bg-slate-100 text-slate-700";
-
-  return (
-    <div className="rounded-xl border border-gray-200 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
-          {status}
-        </span>
-      </div>
-      <p className="mt-2 text-sm text-gray-600">{detail}</p>
-    </div>
-  );
-}
-
-function InfoRow({ text }: { text: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-gray-200 px-4 py-3">
-      <div className="mt-1 h-2.5 w-2.5 rounded-full bg-indigo-600" />
-      <p className="text-sm text-gray-700">{text}</p>
-    </div>
-  );
-}
 
 function ReportCard({
   label,
