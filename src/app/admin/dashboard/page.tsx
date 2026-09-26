@@ -40,8 +40,8 @@ type DashboardCounts = {
   excludedDepartmentAnswers: number;
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_APP_API_URL || "http://localhost:3000";
+const API_BASE_URL ="";
+ 
 
 const CHECK_INS_ENDPOINT = "/api/admin/checkin-responses";
 
