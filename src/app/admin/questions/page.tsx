@@ -1,5 +1,3 @@
-
-Loading older messages…
 import React from "react";
 
 export default function SidebarWidget() {
