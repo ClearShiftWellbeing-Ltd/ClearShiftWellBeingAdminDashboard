@@ -43,7 +43,7 @@ type DashboardCounts = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_APP_API_URL || "http://localhost:3000";
 
-const CHECK_INS_ENDPOINT = "/api/check-ins";
+const CHECK_INS_ENDPOINT = "/api/admin/checkin-responses";
 
 /*
   These are the only default RAG rules.
