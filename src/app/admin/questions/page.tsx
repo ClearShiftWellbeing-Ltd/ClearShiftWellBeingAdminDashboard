@@ -15,17 +15,22 @@ type QuestionOption = {
   score: number;
 };
 
-  const handleAddQuestion = async (e: FormEvent) => {
-    e.preventDefault();
-    try {
-      setQuestion("");
-      setIsSupport(false);
-      setNotice("Question added successfully!");
-    } catch (error) {
-      console.error(error);
-    }
-  };
+type Rag = "red" | "amber" | "green" | "black";
 
+type QuestionOption = {
+  label: string;
+  rag: Rag;
+  score: number;
+};
+
+type Question = {
+  id: string;
+  label: string;
+  rag: Rag;
+  score: number;
+};
+
+type EditableOption = QuestionOption & { id: string };
 
 type EditableOption = QuestionOption & { id: string };
 
@@ -97,4 +102,10 @@ export default function AdminQuestionsPage() {
         console.error(error);
       }
     };
+  return (
+    <div>
+      Admin Questions Page
+    </div>
+  );
+}
 
