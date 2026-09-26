@@ -15,6 +15,9 @@ type QuestionOption = {
   score: number;
 };
 
+  const handleAddQuestion = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
       setQuestion("");
       setIsSupport(false);
       setNotice("Question added successfully!");
@@ -22,6 +25,7 @@ type QuestionOption = {
       console.error(error);
     }
   };
+
 
 type EditableOption = QuestionOption & { id: string };
 
@@ -80,5 +84,17 @@ export default function AdminQuestionsPage() {
   const [items, setItems] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const
+      const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleAddQuestion = async (e: FormEvent) => {
+      e.preventDefault();
+      try {
+
+        setQuestion("");
+        setIsSupport(false);
+        setNotice("Question added successfully!");
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
