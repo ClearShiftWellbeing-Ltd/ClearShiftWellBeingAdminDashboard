@@ -4,6 +4,8 @@ import './globals.css';
 import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 
+export const dynamic = 'force-dynamic';
+
 const outfit = Outfit({
   subsets: ["latin"],
 });
