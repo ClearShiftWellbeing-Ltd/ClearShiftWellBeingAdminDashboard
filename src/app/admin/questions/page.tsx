@@ -1,19 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
   "https://clearshiftwellbeingapis-production.up.railway.app";
-
-type Rag = "red" | "amber" | "green" | "black";
-
-type QuestionOption = {
-  label: string;
-  rag: Rag;
-  score: number;
-};
 
 type Rag = "red" | "amber" | "green" | "black";
 
@@ -29,8 +21,6 @@ type Question = {
   rag: Rag;
   score: number;
 };
-
-type EditableOption = QuestionOption & { id: string };
 
 type EditableOption = QuestionOption & { id: string };
 
@@ -89,23 +79,26 @@ export default function AdminQuestionsPage() {
   const [items, setItems] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-      const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    const handleAddQuestion = async (e: FormEvent) => {
-      e.preventDefault();
-      try {
+  const [question, setQuestion] = useState("");
+  const [isSupport, setIsSupport] = useState(false);
+  const [notice, setNotice] = useState("");
 
-        setQuestion("");
-        setIsSupport(false);
-        setNotice("Question added successfully!");
-      } catch (error) {
-        console.error(error);
-      }
-    };
+  const handleAddQuestion = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      setQuestion("");
+      setIsSupport(false);
+      setNotice("Question added successfully!");
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
     <div>
       Admin Questions Page
     </div>
   );
 }
-
