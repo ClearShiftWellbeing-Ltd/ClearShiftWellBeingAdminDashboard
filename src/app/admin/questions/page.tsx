@@ -15,17 +15,13 @@ type QuestionOption = {
   score: number;
 };
 
-type Question = {
-  _id: string;
-  domain: string;
-  question: string;
-  options: string[] | QuestionOption[];
-  optionsRag?: QuestionOption[];
-  ragMap?: Record<string, Rag>;
-  isPositive?: boolean;
-  isSupport?: boolean;
-  isActive?: boolean;
-};
+      setQuestion("");
+      setIsSupport(false);
+      setNotice("Question added successfully!");
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
 type EditableOption = QuestionOption & { id: string };
 
